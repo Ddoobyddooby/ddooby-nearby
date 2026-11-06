@@ -17,6 +17,8 @@ uv sync
 
 `.env` 파일은 Git에서 제외된다. M0 health와 기본 화면에는 외부 API 키가 필요하지 않다. `VITE_` 변수는 브라우저에 공개되므로 비밀키를 넣지 않는다. 루트 `.env`의 `DATABASE_URL`과 `POSTGRES_*`를 변경한다면 서로 일치시킨다.
 
+M1 지도 초기 중심은 `frontend/.env`의 `VITE_DEFAULT_REGION_CENTER_LAT`, `VITE_DEFAULT_REGION_CENTER_LNG`와 `VITE_DEFAULT_SEARCH_RADIUS_M`로 관리한다. 2026-11-07에 사용자가 지정한 `경기도 남양주시 다산지금로146번길 117`을 [Kakao 지도 주소 검색](https://map.kakao.com/link/search/%EA%B2%BD%EA%B8%B0%EB%8F%84%20%EB%82%A8%EC%96%91%EC%A3%BC%EC%8B%9C%20%EB%8B%A4%EC%82%B0%EC%A7%80%EA%B8%88%EB%A1%9C146%EB%B2%88%EA%B8%B8%20117)에서 `다산동 6235`로 확인했다. 주소 결과의 Kakao 좌표 `537878, 1139009`를 [Kakao Maps `Coords.toLatLng()`](https://apis.map.kakao.com/web/documentation/)로 변환해 WGS84 위도 `37.5998814`, 경도 `127.1715731`을 기록했다. 이는 주소 지점이며 단지의 기하학적 중심을 뜻하지 않는다. 독립 브라우저에서 Kakao SDK 로드와 지도 객체 생성은 확인했으며, 이 프로젝트의 실제 화면 렌더링은 M1 구현 후 검증한다.
+
 ## 2. 매일 쓰는 명령
 
 서버별로 터미널을 분리한다. 명령은 표시된 디렉터리에서 실행한다.
@@ -56,14 +58,16 @@ uv sync
 | M0 health | `curl http://127.0.0.1:8000/api/v1/health` | HTTP 200과 `status: ok` | 확인 완료 |
 | M0 DB | `docker compose up -d db`, `docker compose ps db`, PostGIS 조회 | `healthy`와 PostGIS 연결 | 확인 완료. Apple Silicon에서는 `linux/amd64` 에뮬레이션 |
 | M1 지도·장소 | 구현 후 모바일 너비에서 필터 → 마커/목록 → 상세 이동 | 가상 데이터 표시 유지, 장소 정보 일치 | 미구현 |
+| M1 Kakao SDK 키·도메인 | 등록된 `localhost:5180`에서 SDK 스크립트와 지도 객체 확인 | SDK 로드와 지도 객체 생성 | 2026-11-07 첫 검사 401. 키를 다시 설정한 뒤 `http://localhost:5180`에서 HTTP 200, 브라우저 SDK 로드·지도 객체 생성 확인. `http://127.0.0.1:5180`은 401이며 별도 등록 필요. 이 프로젝트 화면 연동은 미검증 |
 
 ## 5. 자주 만나는 문제
 
-- **5173 포트 점유:** 다른 프로젝트의 서버를 임의로 종료하지 않는다. Vite는 `strictPort`라 포트가 사용 중이면 실패한다. `npm run dev -- --host 127.0.0.1 --port 5180`처럼 별도 포트를 쓰고 루트 `.env`의 `CORS_ORIGINS`에 그 주소를 추가한 뒤 API를 재시작한다.
+- **개발 포트 점유:** 다른 프로젝트의 서버를 임의로 종료하지 않는다. Vite는 `strictPort`라 포트가 사용 중이면 실패한다. 2026-11-07에는 5173과 5180을 `ddooby-pang`이 사용 중이었다. 5180이 비면 `npm run dev -- --host localhost --port 5180`으로 실행하고, 루트 `.env`의 `CORS_ORIGINS`에 `http://localhost:5180`을 추가한다. 다른 포트를 쓰면 그 프론트 주소를 CORS와 Kakao JavaScript SDK 도메인 양쪽에 등록한다.
 - **API 연결 오류:** API 서버가 8000에서 실행 중인지, `frontend/.env`의 `VITE_API_BASE_URL`과 루트 `.env`의 `CORS_ORIGINS`가 실제 주소와 맞는지 확인한다.
 - **DB 연결 오류:** M0 health는 DB를 사용하지 않는다. M2부터 Docker 상태, `DATABASE_URL`, PostGIS 확장·마이그레이션을 함께 확인한다.
 - **의존성 재현:** 프론트는 `npm ci`, 백엔드는 `uv sync`로 lockfile을 사용한다. 설치·해결 실패를 통과로 기록하지 않는다.
 - **외부 API 키 누락:** M0에는 필요하지 않다. M1 지도 SDK 도입 시 Kakao JavaScript 키와 등록 도메인을 확인한다.
+- **Kakao SDK 401 `domain mismatched`:** 브라우저에서 여는 프론트 주소(호스트·포트 포함)가 `VITE_KAKAO_MAP_APP_KEY`와 **같은 앱·같은 JavaScript 키**의 JavaScript SDK 도메인에 저장됐는지 확인한다. 제품 링크의 웹 도메인은 별도 설정이다. 등록 직후라면 설정 반영 후 다시 요청한다. 현재 5173·5180은 다른 프로젝트가 점유 중이므로 프로세스를 임의로 종료하지 않는다.
 
 ## 6. 학습 메모
 
